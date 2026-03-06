@@ -535,33 +535,35 @@
         });
     }
 
-    // Supabase 保存：把 currentFoodData 整个作为 raw_data 存进去
+    // Supabase 保存：把 currentFoodData 整个作为 raw_data 存进去（内置一次自动重试，提升网络不稳定时体验）
     async function saveRecord() {
-        try {
-            const saveBtn = document.querySelector('button[onclick="saveRecord()"]');
-            saveBtn.innerText = '保存中...';
-            saveBtn.disabled = true;
+        const saveBtn = document.querySelector('button[onclick="saveRecord()"]');
+        if (!saveBtn) return;
 
-            const SUPABASE_URL = 'https://hwztfcquovjiuobflnax.supabase.co';
-            const SUPABASE_ANON_KEY = 'sb_publishable_fMBxcS2opE2Pukl2M-ipQA_gIc9bzgb';
-            const TABLE_NAME = 'food_logs';
+        saveBtn.innerText = '保存中...';
+        saveBtn.disabled = true;
 
-            const mealType = sessionStorage.getItem('selectedMealType') || '午餐';
-            const imageBase64 = sessionStorage.getItem('uploadedFoodImage');
-            currentFoodData.image = imageBase64;
-            const saveFoodName = getDisplayFoodName(currentFoodData, mealType);
+        const SUPABASE_URL = 'https://hwztfcquovjiuobflnax.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_fMBxcS2opE2Pukl2M-ipQA_gIc9bzgb';
+        const TABLE_NAME = 'food_logs';
 
-            const recordData = {
-                food_name: saveFoodName,
-                calories: currentFoodData.calories || 0,
-                protein: currentFoodData.protein || 0,
-                fat: currentFoodData.fat || 0,
-                carbs: currentFoodData.carbs || 0,
-                vitamins_minerals: currentFoodData.vitamins_minerals || '未知',
-                meal_type: mealType,
-                raw_data: currentFoodData
-            };
+        const mealType = sessionStorage.getItem('selectedMealType') || '午餐';
+        const imageBase64 = sessionStorage.getItem('uploadedFoodImage');
+        currentFoodData.image = imageBase64;
+        const saveFoodName = getDisplayFoodName(currentFoodData, mealType);
 
+        const recordData = {
+            food_name: saveFoodName,
+            calories: currentFoodData.calories || 0,
+            protein: currentFoodData.protein || 0,
+            fat: currentFoodData.fat || 0,
+            carbs: currentFoodData.carbs || 0,
+            vitamins_minerals: currentFoodData.vitamins_minerals || '未知',
+            meal_type: mealType,
+            raw_data: currentFoodData
+        };
+
+        async function postOnce() {
             const resp = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE_NAME}`, {
                 method: 'POST',
                 headers: {
@@ -572,19 +574,40 @@
                 },
                 body: JSON.stringify(recordData)
             });
-
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error(JSON.stringify(err));
             }
+        }
 
+        let lastError = null;
+        try {
+            // 第一次尝试
+            await postOnce();
+        } catch (e1) {
+            lastError = e1;
+            console.warn('首次保存失败，准备重试一次...', e1);
+            // 等 1.5 秒后自动重试一次
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            try {
+                await postOnce();
+            } catch (e2) {
+                lastError = e2;
+            }
+        }
+
+        if (!lastError) {
+            // 任一尝试成功都算整体成功
             sessionStorage.removeItem('currentFoodData');
             sessionStorage.removeItem('uploadedFoodImage');
             window.location.href = 'index.html';
-        } catch (e) {
-            console.error(e);
-            alert('保存失败：' + e.message);
-            const saveBtn = document.querySelector('button[onclick="saveRecord()"]');
+        } else {
+            console.error(lastError);
+            let msg = String(lastError.message || lastError);
+            if (msg.includes('Failed to fetch')) {
+                msg = '网络似乎不太稳定，请稍后在结果页再次点击“保存记录”重试。';
+            }
+            alert('保存失败：' + msg);
             saveBtn.innerText = '保存记录';
             saveBtn.disabled = false;
         }

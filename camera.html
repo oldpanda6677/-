@@ -353,8 +353,17 @@
             document.getElementById('ai-loading-overlay').classList.add('hidden');
             document.getElementById('ai-loading-overlay').classList.remove('flex');
             document.getElementById('camera-ui').style.display = '';
-            const tip = '若多次失败请检查：本页顶部的智谱 Key 是否已填写、智谱账户是否欠费。';
-            alert('识别失败：' + e.message + '\n\n' + tip);
+
+            let message = (e && e.message) ? String(e.message) : '未知错误';
+            const lower = message.toLowerCase();
+
+            // 针对额度/欠费做更友好的提示，避免用户误以为是程序问题
+            if (lower.includes('quota') || lower.includes('exceeded') || lower.includes('insufficient')) {
+                alert('识别失败：当前智谱账号的免费额度或余额已经用完，暂时无法继续识别。\n\n你可以稍后再试，或在智谱后台充值后刷新本页面。');
+            } else {
+                const tip = '若多次失败请检查：本页顶部的智谱 Key 是否已填写、智谱账户是否欠费。';
+                alert('识别失败：' + message + '\n\n' + tip);
+            }
         }
     }
 

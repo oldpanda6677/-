@@ -36,8 +36,8 @@
             </button>
         </div>
         
-        <!-- 日历容器 -->
-        <div id="calendar-container" class="flex items-center justify-between text-sm text-gray-500 mb-5 px-4 pb-2 overflow-x-auto no-scrollbar"></div>
+        <!-- 日历容器：可横向滚动查看更多日期 -->
+        <div id="calendar-container" class="flex items-center gap-2 text-sm text-gray-500 mb-5 px-4 pb-2 overflow-x-auto no-scrollbar whitespace-nowrap"></div>
 
         <!-- 核心：饮食摄入卡片 -->
         <div class="relative mt-12">
@@ -321,17 +321,16 @@
             closeProfileModal();
         }
 
-        // 恢复日历功能
+        // 日历：真实日期（基于 today），今天默认选中并尽量居中，可左滑看更早，右端只展示今起 2～3 天
         function initCalendar() {
             const container = document.getElementById('calendar-container');
             if(!container) return;
             container.innerHTML = '';
-            const DAYS_WINDOW = 7;
-            const HALF = Math.floor(DAYS_WINDOW / 2);
             const base = new Date(today);
+            const PAST_DAYS = 14;
+            const FUTURE_DAYS = 3;
             const days = [];
-
-            for (let offset = -HALF; offset <= HALF; offset++) {
+            for (let offset = -PAST_DAYS; offset <= FUTURE_DAYS; offset++) {
                 const d = new Date(base);
                 d.setDate(base.getDate() + offset);
                 days.push(d);
@@ -345,17 +344,25 @@
 
                 if (isSelected) {
                     container.innerHTML += `
-                        <div class="flex-1 flex flex-col items-center justify-center relative cursor-pointer min-w-[40px]" onclick="selectDate('${key}')">
-                            <div class="w-8 h-8 ${isToday ? 'bg-[#4A90E2]' : 'bg-[#9DB9FC]'} text-white rounded-full flex items-center justify-center font-medium shadow-md transition-all">${dayNum}</div>
-                            <div class="w-1 h-1 ${isToday ? 'bg-[#4A90E2]' : 'bg-[#9DB9FC]'} rounded-full mt-1"></div>
+                        <div class="flex flex-col items-center justify-center flex-shrink-0 w-10 cursor-pointer" data-date-key="${key}" onclick="selectDate('${key}')">
+                            <div class="w-8 h-8 bg-[#9DB9FC] text-white rounded-full flex items-center justify-center font-semibold shadow-md">${dayNum}</div>
+                            <div class="w-1 h-1 rounded-full mt-1 ${isToday ? 'bg-[#9DB9FC]' : 'bg-transparent'}"></div>
                         </div>`;
                 } else {
                     container.innerHTML += `
-                        <button class="flex-1 flex flex-col items-center justify-center cursor-pointer min-w-[40px]" onclick="selectDate('${key}')">
-                            <span class="${isToday ? 'font-medium text-[#4A90E2]' : ''}">${dayNum}</span>
+                        <button type="button" class="flex flex-col items-center justify-center flex-shrink-0 w-10 cursor-pointer" data-date-key="${key}" onclick="selectDate('${key}')">
+                            <span class="${isToday ? 'font-medium text-[#9DB9FC]' : 'text-gray-500'}">${dayNum}</span>
                         </button>`;
                 }
             });
+
+            // 仅当当前选中的是「今天」时，把今天滚到可视区中间（首屏打开时今天默认选中）
+            if (currentDateKey === todayKey) {
+                setTimeout(() => {
+                    const todayEl = container.querySelector(`[data-date-key="${todayKey}"]`);
+                    if (todayEl) todayEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+                }, 50);
+            }
         }
 
         // 增强版：获取真实数据并计算特质标签（饮食 + 运动）
@@ -626,10 +633,11 @@ window.viewDetail = function(dateKey, index) {
             }
         }
 
-        // 页面加载时执行
+        // 页面加载时执行：初始化目标、日历和当天数据
         window.onload = async () => {
+            applyTargetsToUi();           // 把个人资料计算出的营养目标填到首页（避免显示 0g）
             initCalendar();
-            updateWaterDroplet(180); // 初始水滴状态
+            updateWaterDroplet(180);      // 初始水滴状态
             await fetchRealData(todayKey);
         };
 
