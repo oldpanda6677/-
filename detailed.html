@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>饮食详情</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes float { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, -55%); } }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center h-screen overflow-hidden">
+    <div class="w-full max-w-md h-full relative flex flex-col bg-gray-50 overflow-hidden">
+        
+        <div class="relative h-[55%] w-full bg-gray-200 overflow-hidden">
+            <img id="food-image" class="w-full h-full object-cover" src="" alt="Food">
+            <div class="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/20"></div>
+            
+            <button onclick="window.location.href='index.html'" class="absolute top-12 left-6 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-gray-800 z-20 shadow-md active:scale-90 transition-transform">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+
+            <div id="tags-layer" class="absolute inset-0 z-10"></div>
+        </div>
+
+        <div class="relative flex-1 bg-white rounded-t-[32px] -mt-8 z-20 px-6 pt-8 pb-8 flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.1)] overflow-y-auto no-scrollbar">
+            
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span id="meal-type-badge" class="bg-yellow-400 text-white text-[11px] font-bold px-2 py-0.5 rounded-md">历史记录</span>
+                        <h1 id="food-name" class="text-xl font-bold text-gray-800">加载中...</h1>
+                    </div>
+                    <p class="text-[13px] text-gray-500">总热量: <span id="cal-val-text" class="text-orange-500 font-bold">0千卡</span>，健康评分: <span id="health-score-text" class="text-green-500 font-bold">0分</span></p>
+                </div>
+            </div>
+
+            <div class="space-y-4 mb-4">
+                <div>
+                    <div class="flex justify-between text-[13px] mb-1.5">
+                        <span class="text-gray-600 flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-blue-400"></div>蛋白质</span>
+                        <span class="text-gray-400"><span id="protein-val">0</span>克</span>
+                    </div>
+                    <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden"><div id="protein-bar" class="h-full bg-blue-400 rounded-full transition-all duration-1000" style="width: 0%"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[13px] mb-1.5">
+                        <span class="text-gray-600 flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-blue-600"></div>碳水</span>
+                        <span class="text-gray-400"><span id="carbs-val">0</span>克</span>
+                    </div>
+                    <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden"><div id="carbs-bar" class="h-full bg-blue-600 rounded-full transition-all duration-1000" style="width: 0%"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[13px] mb-1.5">
+                        <span class="text-gray-600 flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-400"></div>脂肪</span>
+                        <span class="text-gray-400"><span id="fat-val">0</span>克</span>
+                    </div>
+                    <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden"><div id="fat-bar" class="h-full bg-red-400 rounded-full transition-all duration-1000" style="width: 0%"></div></div>
+                </div>
+            </div>
+
+            <!-- 维生素与矿物质 -->
+            <div class="mb-4 bg-[#FFF9F2] rounded-[20px] p-4 border border-[#FFE8D1] flex items-start gap-3">
+                <div class="w-6 h-6 bg-[#F5A623] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[#D97706] font-bold text-[13px] mb-1">维生素与矿物质</h3>
+                    <p id="vitamins-text" class="text-[#78350F] text-[12px] leading-relaxed">
+                        分析中...
+                    </p>
+                </div>
+            </div>
+
+            <!-- AI 综合点评 -->
+            <div class="bg-green-50/50 rounded-2xl p-4 mb-6 flex items-center gap-3 border border-green-100/50">
+                <div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white shrink-0"><div class="w-2 h-2 bg-white rounded-full"></div></div>
+                <div id="food-summary" class="text-[12px] text-green-700 leading-relaxed">营养分析中...</div>
+            </div>
+            <!-- 这里完全去掉了底部的按钮 -->
+        </div>
+    </div>
+
+    <script>
+               document.addEventListener('DOMContentLoaded', () => {
+            const detailDataStr = sessionStorage.getItem('detailData');
+            if (!detailDataStr) {
+                alert('读取记录失败！');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const data = JSON.parse(detailDataStr);
+            
+            // 🌟 兼容处理：因为主页传过来的可能是整个数据库行，我们需要拿到 raw_data
+            const coreData = data.raw_data || data;
+
+            // 🌟 读取用户上传的真实照片，如果没有才用默认网图兜底
+            const defaultImage = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80';
+            const finalImage = coreData.image || data.image || defaultImage;
+            document.getElementById('food-image').src = finalImage;
+
+            // 渲染各项数据
+            document.getElementById('meal-type-badge').textContent = data.meal_type || coreData.mealType || '记录';
+            document.getElementById('food-name').textContent = data.food_name || coreData.food_name || "美味食物";
+            document.getElementById('cal-val-text').textContent = (data.calories || coreData.calories || 0) + '千卡';
+            document.getElementById('health-score-text').textContent = (coreData.score || 0) + '分';
+            document.getElementById('food-summary').textContent = coreData.summary || "营养丰富的一餐";
+            document.getElementById('vitamins-text').textContent =
+                coreData.vitamins_minerals || data.vitamins_minerals || "富含多种维生素和矿物质，有助于维持日常健康。";
+            
+            document.getElementById('protein-val').textContent = data.protein || coreData.protein || 0;
+            document.getElementById('fat-val').textContent = data.fat || coreData.fat || 0;
+            document.getElementById('carbs-val').textContent = data.carbs || coreData.carbs || 0;
+
+            setTimeout(() => {
+                document.getElementById('protein-bar').style.width = Math.min(((data.protein || coreData.protein || 0) / 50) * 100, 100) + '%';
+                document.getElementById('fat-bar').style.width = Math.min(((data.fat || coreData.fat || 0) / 50) * 100, 100) + '%';
+                document.getElementById('carbs-bar').style.width = Math.min(((data.carbs || coreData.carbs || 0) / 100) * 100, 100) + '%';
+            }, 100);
+
+            // 渲染只读标签（传入包含坐标的 coreData）
+            renderReadonlyTags(coreData);
+        });
+
+               // 🌟 升级：历史详情页也使用真实的 AI 坐标
+               function renderReadonlyTags(data) {
+            const tagsLayer = document.getElementById('tags-layer');
+            let foodsArray = data.foods || [];
+            if (foodsArray.length === 0) foodsArray = [{ name: data.food_name, calories: data.calories, x: 50, y: 50 }];
+
+            foodsArray.forEach((food, index) => {
+                const posX = food.x ? `${food.x}%` : `${30 + (index * 20)}%`;
+                const posY = food.y ? `${food.y}%` : `${40 + (index * 15)}%`;
+                
+                const isHighCalorie = food.calories > 300;
+                const iconColor = isHighCalorie ? 'text-red-400' : 'text-[#8DC63F]';
+                const textColor = isHighCalorie ? 'text-red-500' : 'text-[#8DC63F]';
+                const statusIcon = `<svg class="w-3.5 h-3.5 ${iconColor}" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.5c-3.58 0-6.5-2.92-6.5-6.5 0-3.35 2.5-6.68 5.54-10.45.24-.3.68-.3.92 0 3.04 3.77 5.54 7.1 5.54 10.45 0 3.58-2.92 6.5-6.5 6.5z"/></svg>`;
+
+                const tagHTML = `
+                    <div class="absolute -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-md rounded-[14px] px-3 py-2 shadow-[0_4px_15px_rgba(0,0,0,0.12)] animate-float min-w-[80px] z-20"
+                         style="top: ${posY}; left: ${posX}; animation-delay: ${index * 0.3}s">
+                        <div class="flex items-center gap-1 mb-1">
+                            ${statusIcon}
+                            <span class="font-bold text-[15px] ${textColor}">${food.calories || 0}<span class="text-[10px] font-normal text-gray-400 ml-0.5">千卡</span></span>
+                        </div>
+                        <div class="border-t border-gray-100 pt-1.5 mt-0.5">
+                            <span class="text-gray-700 text-[12px] font-bold truncate block w-full text-center">${food.name || '未知'}</span>
+                        </div>
+                    </div>
+                `;
+                tagsLayer.insertAdjacentHTML('beforeend', tagHTML);
+            });
+        }
+
+    </script>
+</body>
+</html>

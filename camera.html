@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>拍照识别 - AI 饮食</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes spin-slow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .animate-spin-slow { animation: spin-slow 1.5s linear infinite; }
+
+        @keyframes scan-line {
+            0%   { top: 0%;   opacity: 0; }
+            10%  {           opacity: 1; }
+            90%  {           opacity: 1; }
+            100% { top:100%; opacity: 0; }
+        }
+        .animate-scan { animation: scan-line 2.5s cubic-bezier(0.4,0,0.2,1) infinite; }
+    </style>
+</head>
+<body class="bg-black flex justify-center h-screen overflow-hidden">
+<div class="w-full max-w-md h-full relative flex flex-col bg-black shadow-2xl overflow-hidden">
+
+    <!-- 顶部返回 -->
+    <div class="pt-14 pb-4 px-5 bg-black flex items-center justify-between z-20">
+        <button onclick="window.location.href='index.html'"
+                class="flex items-center text-white active:scale-90 transition-transform">
+            <svg class="w-6 h-6 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 19l-7-7 7-7"/>
+            </svg>
+            <span class="text-[15px] font-medium tracking-wide">拍照</span>
+        </button>
+        <div class="w-10"></div>
+    </div>
+
+    <!-- 核心画面区 -->
+    <div class="relative flex-1 bg-[#9E9E9E] overflow-hidden rounded-t-2xl rounded-b-2xl">
+        <video id="camera-feed" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline></video>
+        <div id="flash-effect"
+             class="absolute inset-0 bg-white opacity-0 transition-opacity duration-100 hidden z-50"></div>
+
+        <div id="camera-ui" class="absolute inset-0 z-10 flex flex-col justify-between pb-6">
+            <!-- 扫描框 -->
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[280px] h-[280px]">
+                <div
+                    class="absolute -top-10 left-1/2 transform -translate-x-1/2 text-white text-[15px] font-medium tracking-widest drop-shadow-md whitespace-nowrap">
+                    确保食物在辅助框内
+                </div>
+                <div class="absolute top-0 left-0 w-10 h-10 border-t-[1.5px] border-l-[1.5px] border-white rounded-tl-3xl"></div>
+                <div class="absolute top-0 right-0 w-10 h-10 border-t-[1.5px] border-r-[1.5px] border-white rounded-tr-3xl"></div>
+                <div class="absolute bottom-0 left-0 w-10 h-10 border-b-[1.5px] border-l-[1.5px] border-white rounded-bl-3xl"></div>
+                <div class="absolute bottom-0 right-0 w-10 h-10 border-b-[1.5px] border-r-[1.5px] border-white rounded-br-3xl"></div>
+                <div
+                    class="absolute left-2 right-2 h-[2px] bg-gradient-to-r from-transparent via-white to-transparent animate-scan shadow-[0_0_10px_rgba(255,255,255,0.8)]"></div>
+            </div>
+
+            <!-- 餐别选择：选中的会传给结果页与保存时的 meal_type -->
+            <div class="flex justify-center gap-3 px-4 mt-auto">
+                <button onclick="selectMeal(this)"
+                        class="meal-btn bg-black/40 border-transparent backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[13px] flex items-center gap-1.5 border transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M21 15a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6z"/>
+                    </svg>
+                    早餐
+                </button>
+                <button onclick="selectMeal(this)"
+                        class="meal-btn bg-white/20 border-white/50 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[13px] flex items-center gap-1.5 border transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M21 15a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6z"/>
+                    </svg>
+                    午餐
+                </button>
+                <button onclick="selectMeal(this)"
+                        class="meal-btn bg-black/40 border-transparent backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[13px] flex items-center gap-1.5 border transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M21 15a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6z"/>
+                    </svg>
+                    晚餐
+                </button>
+                <button onclick="selectMeal(this)"
+                        class="meal-btn bg-black/40 border-transparent backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[13px] flex items-center gap-1.5 border transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M21 15a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v6z"/>
+                    </svg>
+                    加餐
+                </button>
+            </div>
+        </div>
+
+        <!-- AI Loading 蒙层 -->
+        <div id="ai-loading-overlay"
+             class="absolute inset-0 z-[60] hidden flex-col items-center justify-center">
+            <img id="loading-bg-img"
+                 class="absolute inset-0 w-full h-full object-cover"
+                 src="" alt="">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
+            <div class="relative w-20 h-20 mb-5 flex items-center justify-center z-10">
+                <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="46" fill="none"
+                            stroke="rgba(255,255,255,0.2)" stroke-width="3"></circle>
+                </svg>
+                <svg class="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#5484FF" stroke-width="3"
+                            stroke-dasharray="90 200" stroke-linecap="round"></circle>
+                </svg>
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <h3 class="text-white text-lg font-bold tracking-widest mb-1.5 z-10">AI 正在深度分析</h3>
+            <p class="text-white/80 text-[13px] font-medium tracking-wide z-10">提取食物特征，计算热量中...</p>
+        </div>
+    </div>
+
+    <!-- 底部：相册 + 拍照按钮 -->
+    <div class="h-[180px] bg-black flex items-center justify-between px-12 z-20 pb-6">
+        <div class="flex flex-col items-center gap-2 cursor-pointer group"
+             onclick="document.getElementById('gallery-input').click()">
+            <div
+                class="w-12 h-12 rounded-full border border-white/40 flex items-center justify-center group-active:scale-90 transition-transform">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <span class="text-white text-[11px] tracking-wider">相册</span>
+        </div>
+        <button onclick="takePhoto()" class="relative flex items-center justify-center group">
+            <div
+                class="w-[80px] h-[80px] rounded-full border-[3px] border-white flex items-center justify-center group-active:scale-95 transition-transform duration-200">
+                <div class="w-[66px] h-[66px] bg-white rounded-full"></div>
+            </div>
+        </button>
+        <div class="w-12"></div>
+    </div>
+</div>
+
+<input type="file" id="gallery-input" accept="image/*" style="display:none" onchange="handleGalleryUpload(event)">
+
+<script>
+    const video = document.getElementById('camera-feed');
+    // 直连智谱（Key 填下面，仅本地/内网用；若以后部署到公网再改回 Worker 可避免 Key 暴露）
+    const ZHIPU_API_KEY = '1ecc1547e6504a6aa2ed07044509c121.fIyRuMojIPmRsEzV';
+    const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    let currentMealType = '午餐';
+
+    async function initCamera() {
+        const constraints = [
+            { video: { facingMode: 'environment' } },  // 手机后摄
+            { video: { facingMode: 'user' } },          // 手机前摄/电脑摄像头
+            { video: true }                             // 任意摄像头
+        ];
+        for (const c of constraints) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(c);
+                video.srcObject = stream;
+                return;
+            } catch (e) {
+                console.warn("摄像头尝试失败:", c, e.message);
+            }
+        }
+        // 没有任何摄像头可用时，显示提示，相册仍可用
+        video.style.display = 'none';
+        const container = video.closest('.relative');
+        if (container && !document.getElementById('no-camera-hint')) {
+            const hint = document.createElement('div');
+            hint.id = 'no-camera-hint';
+            hint.className = 'absolute inset-0 flex flex-col items-center justify-center text-white/90 px-6 text-center';
+            hint.innerHTML = '<p class="text-base font-medium mb-2">未检测到可用摄像头</p><p class="text-sm text-white/70">请点击下方「相册」选择食物照片进行识别</p>';
+            container.appendChild(hint);
+        }
+    }
+
+    function selectMeal(btn) {
+        document.querySelectorAll('.meal-btn').forEach(b => {
+            b.classList.remove('bg-white/20', 'border-white/50');
+            b.classList.add('bg-black/40', 'border-transparent');
+        });
+        btn.classList.remove('bg-black/40', 'border-transparent');
+        btn.classList.add('bg-white/20', 'border-white/50');
+        currentMealType = btn.innerText.trim();
+    }
+
+    function takePhoto() {
+        if (!video.srcObject) {
+            alert("摄像头不可用，请使用相册上传");
+            return;
+        }
+        const flash = document.getElementById('flash-effect');
+        flash.classList.remove('hidden', 'opacity-0');
+        flash.classList.add('opacity-100');
+        setTimeout(() => {
+            flash.classList.remove('opacity-100');
+            flash.classList.add('opacity-0');
+            setTimeout(() => flash.classList.add('hidden'), 100);
+        }, 50);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        processImageWithAI(canvas.toDataURL('image/jpeg', 0.8));
+    }
+
+    function handleGalleryUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => processImageWithAI(ev.target.result);
+        reader.readAsDataURL(file);
+    }
+
+    async function processImageWithAI(base64Image) {
+        if (video && video.srcObject) {
+            video.srcObject.getTracks().forEach(t => t.stop());
+        }
+        document.getElementById('camera-ui').style.display = 'none';
+        const overlay = document.getElementById('ai-loading-overlay');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        document.getElementById('loading-bg-img').src = base64Image;
+
+        try {
+            // 提示词：在保证完整菜品的前提下，识别所有清晰的盘子/碗/饮料，并返回坐标和营养信息
+            const prompt = `你是饮食营养识别AI。请根据图片中实际看到的食物进行识别，只输出一个 JSON，不要任何解释。
+【重要1】所有文字必须中文。【重要2】每道菜的 name 必须与图中该道菜真实内容一致：看到青椒就写青椒/炒青椒，看到面条就写面条/汤面，看到粥就写粥/小米粥，不要张冠李戴、不要猜没有出现的食物。
+【重要3】坐标 (x,y) 必须是该道菜在图片中的大致中心位置（0–100 百分比），标签会按坐标显示在图上，所以 name 与 (x,y) 必须一一对应。
+
+要求：
+1. 以完整菜品为单位（如炒青椒、牛肉面、橙汁），多份分开的菜/饮料在 foods 里分别列出，每项 name、calories、x、y。
+2. 只识别图中明确可见的菜品，看不清或不确定的不要编造；热量按常见份量估算。
+3. 输出整餐总热量、蛋白质、脂肪、碳水、简短维生素矿物质描述、健康评分(0–100)、一句总结。
+
+严格按下面格式输出一个 JSON，直接以 { 开头以 } 结尾，不要 \`\`\`：
+{"is_food":true,"food_name":"示例","foods":[{"name":"菜名","calories":200,"x":50,"y":50}],"calories":200,"protein":10,"fat":5,"carbs":30,"vitamins_minerals":"简短描述","score":80,"summary":"一句话"}`;
+
+            let resp;
+            try {
+                resp = await fetch(ZHIPU_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + ZHIPU_API_KEY
+                    },
+                    body: JSON.stringify({
+                        model: 'glm-4v',
+                        messages: [{
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: prompt },
+                                { type: 'image_url', image_url: { url: base64Image } }
+                            ]
+                        }]
+                    })
+                });
+            } catch (netErr) {
+                console.error('请求智谱失败', netErr);
+                throw new Error('无法连接智谱（检查网络或 Key 是否填对）');
+            }
+
+            if (!resp.ok) {
+                const errText = await resp.text();
+                console.error('智谱返回', resp.status, errText);
+                throw new Error('智谱返回 ' + resp.status + '，请检查 Key 是否有效、账户是否欠费');
+            }
+            let result;
+            try {
+                result = await resp.json();
+            } catch (parseErr) {
+                console.error('响应不是有效 JSON', parseErr);
+                throw new Error('服务器返回格式异常，请稍后重试');
+            }
+            if (!result) throw new Error('服务器未返回数据');
+            if (result.error) throw new Error(result.error.message || result.error.code || 'AI 返回错误');
+
+            // 兼容智谱多种返回：content 可能是字符串、数组，或 choices[0].text
+            let rawContent = result.choices?.[0]?.message?.content;
+            if (rawContent === undefined) rawContent = result.choices?.[0]?.text;
+            let aiReply = '';
+            if (Array.isArray(rawContent)) {
+                aiReply = rawContent.map(part => {
+                    if (!part) return '';
+                    if (part.text != null) return String(part.text);
+                    if (part.content != null) return String(part.content);
+                    if (typeof part === 'string') return part;
+                    return '';
+                }).join('');
+            } else if (rawContent != null) {
+                aiReply = String(rawContent);
+            }
+            if (!aiReply || aiReply.trim().length < 2) {
+                console.error('AI 返回内容为空', result);
+                throw new Error('智谱未返回识别内容，请检查 Key 与账户');
+            }
+            aiReply = aiReply.replace(/```json/gi, '').replace(/```/g, '').trim();
+            // 提取第一个完整 {...}：从第一个 { 开始，按括号匹配到对应的 }
+            const start = aiReply.indexOf('{');
+            let end = -1;
+            if (start !== -1) {
+                let depth = 0;
+                for (let i = start; i < aiReply.length; i++) {
+                    if (aiReply[i] === '{') depth++;
+                    else if (aiReply[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+                }
+            }
+            if (start === -1 || end === -1) {
+                console.error('未找到 JSON，智谱返回:', aiReply.slice(0, 400));
+                throw new Error('智谱返回格式不符，请重试或换一张更清晰的食物图');
+            }
+            const jsonStr = aiReply.substring(start, end + 1);
+            let foodData;
+            try {
+                foodData = JSON.parse(jsonStr);
+            } catch (parseErr) {
+                console.error('JSON 解析失败，内容片段:', jsonStr.slice(0, 300), parseErr);
+                throw new Error('AI 返回数据格式有误，请重试');
+            }
+            if (!foodData || typeof foodData !== 'object') {
+                throw new Error('AI 返回数据异常，请重试');
+            }
+            // 补全结构，避免结果页报错
+            if (!Array.isArray(foodData.foods)) foodData.foods = [];
+            if (foodData.foods.length === 0 && foodData.food_name) {
+                foodData.foods = [{ name: foodData.food_name, calories: foodData.calories || 0, x: 50, y: 50 }];
+            }
+            foodData.foods.forEach((f, i) => {
+                if (f && typeof f === 'object') {
+                    if (f.x == null) f.x = 50;
+                    if (f.y == null) f.y = 30 + i * 20;
+                }
+            });
+            if (foodData.is_food === false) {
+                alert('未检测到清晰的食物，请重新拍摄。');
+                window.location.reload();
+                return;
+            }
+
+            sessionStorage.setItem('currentFoodData', JSON.stringify(foodData));
+            sessionStorage.setItem('uploadedFoodImage', base64Image);
+            sessionStorage.setItem('selectedMealType', currentMealType);
+            window.location.href = 'result.html';
+        } catch (e) {
+            console.error(e);
+            document.getElementById('ai-loading-overlay').classList.add('hidden');
+            document.getElementById('ai-loading-overlay').classList.remove('flex');
+            document.getElementById('camera-ui').style.display = '';
+            const tip = '若多次失败请检查：本页顶部的智谱 Key 是否已填写、智谱账户是否欠费。';
+            alert('识别失败：' + e.message + '\n\n' + tip);
+        }
+    }
+
+    window.onload = initCamera;
+</script>
+</body>
+</html>

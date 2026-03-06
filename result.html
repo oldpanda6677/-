@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>识别结果 - AI 饮食</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes float { 0%,100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, -55%); } }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+
+        .draggable-label { touch-action: none; cursor: grab; }
+        .draggable-label.dragging { cursor: grabbing; }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center h-screen overflow-hidden">
+<div class="w-full max-w-md h-full relative flex flex-col bg-gray-50 overflow-hidden">
+
+    <!-- 顶部图片 + 标签层 -->
+    <div id="image-container" class="relative h-[55%] w-full bg-gray-200 overflow-hidden">
+        <img id="food-image" class="w-full h-full object-cover" src="" alt="Food">
+        <div class="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/20"></div>
+
+        <!-- 返回主页 -->
+        <button onclick="window.location.href='index.html'"
+                class="absolute top-12 left-6 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-gray-800 z-20 shadow-md active:scale-90 transition-transform">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                      d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+
+        <!-- 动态标签容器 -->
+        <div id="tags-layer" class="absolute inset-0 z-10"></div>
+    </div>
+
+    <!-- 下半部分内容 -->
+    <div
+        class="relative flex-1 bg-white rounded-t-[32px] -mt-8 z-20 px-6 pt-8 pb-8 flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.1)] overflow-y-auto no-scrollbar">
+
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span
+                        class="bg-yellow-400 text-white text-[11px] font-bold px-2 py-0.5 rounded-md">智能识别</span>
+                    <span id="meal-type-badge" class="bg-gray-200 text-gray-700 text-[11px] font-medium px-2 py-0.5 rounded-md">午餐</span>
+                    <h1 id="food-name" class="text-xl font-bold text-gray-800">加载中...</h1>
+                </div>
+                <p class="text-[13px] text-gray-500">
+                    总热量：
+                    <span id="cal-val-text" class="text-orange-500 font-bold">0千卡</span>，
+                    健康评分：
+                    <span id="health-score-text" class="text-green-500 font-bold">0分</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- 三个营养进度条 -->
+        <div class="space-y-4 mb-4">
+            <div>
+                <div class="flex justify-between text-[13px] mb-1.5">
+                    <span class="text-gray-600 flex items-center gap-1.5">
+                        <div class="w-2 h-2 rounded-full bg-blue-400"></div>蛋白质
+                    </span>
+                    <span class="text-gray-400"><span id="protein-val">0</span>克</span>
+                </div>
+                <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div id="protein-bar"
+                         class="h-full bg-blue-400 rounded-full transition-all duration-1000"
+                         style="width:0%"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex justify-between text-[13px] mb-1.5">
+                    <span class="text-gray-600 flex items-center gap-1.5">
+                        <div class="w-2 h-2 rounded-full bg-blue-600"></div>碳水
+                    </span>
+                    <span class="text-gray-400"><span id="carbs-val">0</span>克</span>
+                </div>
+                <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div id="carbs-bar"
+                         class="h-full bg-blue-600 rounded-full transition-all duration-1000"
+                         style="width:0%"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex justify-between text-[13px] mb-1.5">
+                    <span class="text-gray-600 flex items-center gap-1.5">
+                        <div class="w-2 h-2 rounded-full bg-red-400"></div>脂肪
+                    </span>
+                    <span class="text-gray-400"><span id="fat-val">0</span>克</span>
+                </div>
+                <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div id="fat-bar"
+                         class="h-full bg-red-400 rounded-full transition-all duration-1000"
+                         style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 维生素与矿物质 -->
+        <div class="mb-4 bg-[#FFF9F2] rounded-[20px] p-4 border border-[#FFE8D1] flex items-start gap-3">
+            <div
+                class="w-6 h-6 bg-[#F5A623] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"
+                          d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-[#D97706] font-bold text-[13px] mb-1">维生素与矿物质</h3>
+                <p id="vitamins-text" class="text-[#78350F] text-[12px] leading-relaxed">
+                    分析中...
+                </p>
+            </div>
+        </div>
+
+        <!-- AI 综合点评 -->
+        <div
+            class="bg-green-50/50 rounded-2xl p-4 mb-3 flex items-center gap-3 border border-green-100/50">
+            <div
+                class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white shrink-0">
+                <div class="w-2 h-2 bg-white rounded-full"></div>
+            </div>
+            <div id="food-summary"
+                 class="text-[12px] text-green-700 leading-relaxed">营养分析中...</div>
+        </div>
+
+        <!-- 标签补充操作 -->
+        <div class="flex justify-end mb-3">
+            <button type="button"
+                    onclick="addFoodTag()"
+                    class="text-[12px] text-[#5484FF] font-medium active:scale-95 transition-transform">
+                + 手动添加食物标签
+            </button>
+        </div>
+
+        <!-- 底部按钮 -->
+        <div id="action-buttons" class="flex gap-4 mt-auto pt-2">
+            <button onclick="window.location.href='camera.html'"
+                    class="flex-1 py-3.5 rounded-full border border-gray-200 text-gray-600 font-medium text-[15px] active:scale-95 transition-transform">
+                重新拍照
+            </button>
+            <button onclick="saveRecord()"
+                    class="flex-1 py-3.5 rounded-full bg-[#5484FF] text-white font-medium text-[15px] shadow-lg shadow-blue-500/30 active:scale-95 transition-transform">
+                保存记录
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 预估重量弹窗：第一行主标题 + 小号浅灰副标题，无第三行 -->
+<div id="weight-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-[320px] w-full p-5">
+        <div class="mb-3">
+            <span class="text-[15px] font-medium text-gray-800">预估重量(克)</span>
+            <span class="text-[11px] text-gray-400 ml-1.5 align-middle">AI智能识别换算成热量</span>
+        </div>
+        <input type="number" id="weight-modal-input" value="100" min="1" max="9999"
+               class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[15px] focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none">
+        <div class="flex gap-2 mt-4">
+            <button type="button" id="weight-modal-cancel"
+                    class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[14px]">取消</button>
+            <button type="button" id="weight-modal-ok"
+                    class="flex-1 py-2.5 rounded-xl bg-[#5484FF] text-white text-[14px] font-medium">确定</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentFoodData = {};
+    let recognizedFoods = [];
+
+    function showWeightModal(defaultVal) {
+        const el = document.getElementById('weight-modal');
+        const input = document.getElementById('weight-modal-input');
+        input.value = defaultVal != null ? String(defaultVal) : '100';
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+        input.focus();
+        input.select();
+        return new Promise((resolve) => {
+            const ok = () => {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+                const v = input.value.trim();
+                resolve(v === '' ? null : v);
+            };
+            const cancel = () => {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+                resolve(null);
+            };
+            document.getElementById('weight-modal-ok').onclick = ok;
+            document.getElementById('weight-modal-cancel').onclick = cancel;
+            input.onkeydown = (e) => { if (e.key === 'Enter') ok(); if (e.key === 'Escape') cancel(); };
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const foodDataStr = sessionStorage.getItem('currentFoodData');
+        const imageBase64 = sessionStorage.getItem('uploadedFoodImage');
+
+        if (!foodDataStr || !imageBase64) {
+            alert('没有找到食物数据！');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        document.getElementById('food-image').src = imageBase64;
+        currentFoodData = JSON.parse(foodDataStr);
+        renderPageData();
+    });
+
+    // 优先显示食物名称；仅当 AI 只返回餐段且多道菜时才用「丰盛+餐段」
+    function getDisplayFoodName(data, mealType) {
+        const d = data || {};
+        const rawName = (d.food_name || '未知食物').trim();
+        const mealLabels = ['早餐', '午餐', '晚餐', '加餐'];
+        if (!mealLabels.includes(rawName)) return rawName;
+        const foods = d.foods;
+        if (!Array.isArray(foods)) return '丰盛' + mealType;
+        if (foods.length === 1 && foods[0].name) return foods[0].name.trim();
+        if (foods.length === 2) {
+            const a = (foods[0].name || '').trim();
+            const b = (foods[1].name || '').trim();
+            if (a || b) return a ? (b ? a + '、' + b : a) : b;
+        }
+        return '丰盛' + mealType;
+    }
+
+    function renderPageData() {
+        const d = currentFoodData || {};
+        const mealType = sessionStorage.getItem('selectedMealType') || '午餐';
+        const finalName = getDisplayFoodName(d, mealType);
+        const finalCal = d.calories || 0;
+
+        document.getElementById('meal-type-badge').textContent = mealType;
+        document.getElementById('food-name').textContent = finalName;
+        document.getElementById('cal-val-text').textContent = finalCal + '千卡';
+        document.getElementById('health-score-text').textContent = (d.score || 0) + '分';
+        document.getElementById('food-summary').textContent =
+            d.summary || '营养丰富的一餐';
+        document.getElementById('vitamins-text').textContent =
+            d.vitamins_minerals || '富含多种维生素和矿物质，有助于维持日常健康。';
+
+        document.getElementById('protein-val').textContent = d.protein || 0;
+        document.getElementById('fat-val').textContent = d.fat || 0;
+        document.getElementById('carbs-val').textContent = d.carbs || 0;
+
+        setTimeout(() => {
+            document.getElementById('protein-bar').style.width =
+                Math.min(((d.protein || 0) / 50) * 100, 100) + '%';
+            document.getElementById('fat-bar').style.width =
+                Math.min(((d.fat || 0) / 40) * 100, 100) + '%';
+            document.getElementById('carbs-bar').style.width =
+                Math.min(((d.carbs || 0) / 120) * 100, 100) + '%';
+        }, 100);
+
+        renderTags();
+    }
+
+    // 手动新增一个食物标签（用于 AI 漏识别时人工补充）
+    async function addFoodTag() {
+        const name = prompt("新食物名称：", "新菜品");
+        if (name === null || !name.trim()) return;
+
+        const hasKey = ZHIPU_API_KEY && !String(ZHIPU_API_KEY).includes('填') && ZHIPU_API_KEY.length >= 10;
+        let cal = 0;
+        let weightGrams = 0;
+        if (hasKey) {
+            const weightStr = await showWeightModal("100");
+            if (weightStr !== null && weightStr.trim() !== '') {
+                const w = parseInt(weightStr.trim(), 10);
+                if (!isNaN(w) && w > 0) {
+                    const estimated = await estimateCaloriesByNameAndWeight(name.trim(), w);
+                    cal = estimated != null ? estimated : parseInt(prompt("AI 换算失败，请直接输入热量(千卡)：", "100") || '0', 10) || 0;
+                    weightGrams = w;
+                } else {
+                    const calStr = prompt("请输入热量(千卡)：", "100");
+                    if (calStr !== null && !isNaN(calStr)) cal = parseInt(calStr, 10) || 0;
+                }
+            } else {
+                const calStr = prompt("请输入热量(千卡)：", "100");
+                if (calStr !== null && !isNaN(calStr)) cal = parseInt(calStr, 10) || 0;
+            }
+        } else {
+            const calStr = prompt("未配置 AI 换算，请直接输入热量(千卡)：", "100");
+            if (calStr !== null && !isNaN(calStr)) cal = parseInt(calStr, 10) || 0;
+        }
+
+        if (!Array.isArray(currentFoodData.foods)) currentFoodData.foods = [];
+        const newItem = { name: name.trim(), calories: cal, x: 50, y: 50 };
+        if (weightGrams > 0) newItem.weight_grams = weightGrams;
+        currentFoodData.foods.push(newItem);
+
+        let totalCal = 0;
+        currentFoodData.foods.forEach(f => { totalCal += f.calories || 0; });
+        currentFoodData.calories = totalCal;
+        sessionStorage.setItem('currentFoodData', JSON.stringify(currentFoodData));
+        renderPageData();
+    }
+
+    // 智谱 API，用于编辑时「输入克数→AI 估算热量」。与 camera.html 填同一 Key 即可。
+    const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    const ZHIPU_API_KEY = '1ecc1547e6504a6aa2ed07044509c121.fIyRuMojIPmRsEzV'; // 与 camera 页相同，留空则编辑时改为直接输入千卡
+
+    async function estimateCaloriesByNameAndWeight(foodName, weightG) {
+        if (!ZHIPU_API_KEY || ZHIPU_API_KEY.includes('填') || ZHIPU_API_KEY.length < 10) return null;
+        try {
+            const resp = await fetch(ZHIPU_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ZHIPU_API_KEY },
+                body: JSON.stringify({
+                    model: 'glm-4-flash',
+                    messages: [{ role: 'user', content: `仅用一行回答一个数字（单位千卡，不要其他文字）：「${foodName}」约${weightG}克，热量约多少千卡？` }]
+                })
+            });
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+            const num = parseInt(String(text).replace(/[^0-9]/g, ''), 10);
+            return isNaN(num) ? null : Math.max(0, Math.min(2000, num));
+        } catch (e) { return null; }
+    }
+
+    // 手动删除一道食物标签（减少标签，总热量会重新汇总）
+    function removeFood(index) {
+        if (!Array.isArray(currentFoodData.foods) || !currentFoodData.foods[index]) return;
+        if (currentFoodData.foods.length <= 1) {
+            alert('至少保留一道食物，可修改名称或热量。');
+            return;
+        }
+        currentFoodData.foods.splice(index, 1);
+        let totalCal = 0;
+        currentFoodData.foods.forEach(f => { totalCal += f.calories || 0; });
+        currentFoodData.calories = totalCal;
+        sessionStorage.setItem('currentFoodData', JSON.stringify(currentFoodData));
+        renderPageData();
+    }
+
+    // 编辑已有标签：改名称 + 输入克数由 AI 估算热量（Key 未配置则改为直接输入千卡）
+    async function editFood(index) {
+        if (!Array.isArray(currentFoodData.foods) || !currentFoodData.foods[index]) return;
+        const target = currentFoodData.foods[index];
+
+        const newName = prompt("修改食物名称：", target.name || "");
+        if (newName === null || !newName.trim()) return;
+        target.name = newName.trim();
+
+        const hasKey = ZHIPU_API_KEY && !String(ZHIPU_API_KEY).includes('填') && ZHIPU_API_KEY.length >= 10;
+        let newCal = target.calories || 0;
+
+        if (hasKey) {
+            const weightStr = await showWeightModal("100");
+            if (weightStr !== null && weightStr.trim() !== '') {
+                const w = parseInt(weightStr.trim(), 10);
+                if (!isNaN(w) && w > 0) {
+                    const estimated = await estimateCaloriesByNameAndWeight(target.name, w);
+                    if (estimated != null) {
+                        newCal = estimated;
+                        target.weight_grams = w;
+                    } else {
+                        newCal = parseInt(prompt("AI 换算失败，请直接输入热量(千卡)：", String(target.calories || 0)) || '0', 10) || 0;
+                    }
+                }
+            }
+        } else {
+            const calStr = prompt("未配置 AI 换算，请直接输入热量(千卡)：", String(target.calories || 0));
+            if (calStr !== null && !isNaN(calStr)) newCal = parseInt(calStr, 10) || 0;
+        }
+
+        target.calories = newCal;
+        let totalCal = 0;
+        currentFoodData.foods.forEach(f => { totalCal += f.calories || 0; });
+        currentFoodData.calories = totalCal;
+        sessionStorage.setItem('currentFoodData', JSON.stringify(currentFoodData));
+        renderPageData();
+    }
+
+    // 渲染 N 个标签 + 可拖动
+    function renderTags() {
+        const layer = document.getElementById('tags-layer');
+        layer.innerHTML = '';
+
+        let foods = currentFoodData.foods;
+        if (!Array.isArray(foods) || foods.length === 0) {
+            foods = [{
+                name: currentFoodData.food_name || '未知食物',
+                calories: currentFoodData.calories || 0,
+                x: 50,
+                y: 50
+            }];
+        }
+
+        recognizedFoods = foods;
+
+        foods.forEach((food, index) => {
+            const hasX = typeof food.x === 'number';
+            const hasY = typeof food.y === 'number';
+            const defaultX = 30 + index * 20;
+            const defaultY = 40 + index * 15;
+
+            const xPct = hasX ? food.x : defaultX;
+            const yPct = hasY ? food.y : defaultY;
+
+            const isHigh = (food.calories || 0) > 300;
+            const iconColor = isHigh ? 'text-red-400' : 'text-[#8DC63F]';
+            const textColor = isHigh ? 'text-red-500' : 'text-[#8DC63F]';
+
+            const div = document.createElement('div');
+            div.className =
+                'draggable-label absolute -translate-x-1/2 -translate-y-1/2 bg-white rounded-[14px] px-3 py-2 shadow-[0_4px_15px_rgba(0,0,0,0.12)] animate-float min-w-[90px] z-20';
+            div.style.left = xPct + '%';
+            div.style.top = yPct + '%';
+            div.style.animationDelay = `${index * 0.25}s`;
+            div.dataset.index = String(index);
+            div.dataset.leftPct = String(xPct);
+            div.dataset.topPct = String(yPct);
+
+            const weightTip = (food.weight_grams > 0) ? `<span class="text-[10px] text-gray-400 block">约${food.weight_grams}g→</span>` : '';
+            div.innerHTML = `
+                <div class="flex items-center gap-1 mb-1">
+                    <svg class="w-3.5 h-3.5 ${iconColor}" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 21.5c-3.58 0-6.5-2.92-6.5-6.5 0-3.35 2.5-6.68 5.54-10.45.24-.3.68-.3.92 0 3.04 3.77 5.54 7.1 5.54 10.45 0 3.58-2.92 6.5-6.5 6.5z"/>
+                    </svg>
+                    <span class="font-bold text-[15px] ${textColor}">
+                        ${food.calories || 0}
+                        <span class="text-[10px] font-normal text-gray-400 ml-0.5">千卡</span>
+                    </span>
+                </div>
+                <div class="border-t border-gray-100 pt-1.5 mt-0.5">
+                    ${weightTip}
+                    <div class="flex items-center justify-between gap-2">
+                    <span class="text-gray-700 text-[12px] font-bold truncate flex-1 min-w-0">
+                        ${food.name || '未知'}
+                    </span>
+                    <span class="flex items-center gap-2 flex-shrink-0">
+                        <button type="button" onclick="editFood(${index})"
+                                class="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-gray-500 hover:text-gray-700 active:bg-gray-100 rounded-xl transition-colors touch-manipulation" title="编辑">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            </svg>
+                        </button>
+                        <button type="button" onclick="removeFood(${index})"
+                                class="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-gray-500 hover:text-red-500 active:bg-red-50 rounded-xl transition-colors touch-manipulation" title="删除此标签">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </span>
+                    </div>
+                </div>
+            `;
+
+            layer.appendChild(div);
+        });
+
+        initDraggableLabels();
+    }
+
+    function initDraggableLabels() {
+        const container = document.getElementById('image-container');
+        if (!container) return;
+        container.querySelectorAll('.draggable-label')
+            .forEach(el => setupDragForLabel(el, container));
+    }
+
+    function setupDragForLabel(el, container) {
+        let startX = 0, startY = 0;
+        let startLeft = 0, startTop = 0;
+        let dragging = false;
+
+        el.addEventListener('pointerdown', e => {
+            if (e.target.closest('button')) return;
+            e.preventDefault();
+            dragging = true;
+            el.classList.add('dragging');
+            el.setPointerCapture(e.pointerId);
+
+            const rect = container.getBoundingClientRect();
+            const r = el.getBoundingClientRect();
+            startLeft = (r.left + r.width / 2 - rect.left) / rect.width * 100;
+            startTop = (r.top + r.height / 2 - rect.top) / rect.height * 100;
+            startX = e.clientX;
+            startY = e.clientY;
+        });
+
+        el.addEventListener('pointermove', e => {
+            if (!dragging) return;
+            e.preventDefault();
+            const rect = container.getBoundingClientRect();
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let newLeft = startLeft + dx / rect.width * 100;
+            let newTop = startTop + dy / rect.height * 100;
+            newLeft = Math.max(5, Math.min(95, newLeft));
+            newTop = Math.max(5, Math.min(95, newTop));
+
+            el.style.left = newLeft + '%';
+            el.style.top = newTop + '%';
+            el.dataset.leftPct = String(newLeft);
+            el.dataset.topPct = String(newTop);
+        });
+
+        el.addEventListener('pointerup', e => {
+            if (!dragging) return;
+            dragging = false;
+            el.classList.remove('dragging');
+            try { el.releasePointerCapture(e.pointerId); } catch {}
+
+            const idx = parseInt(el.dataset.index || '-1', 10);
+            if (isNaN(idx) || !currentFoodData.foods || !currentFoodData.foods[idx]) return;
+
+            const x = parseFloat(el.dataset.leftPct || '50');
+            const y = parseFloat(el.dataset.topPct || '50');
+            currentFoodData.foods[idx].x = x;
+            currentFoodData.foods[idx].y = y;
+
+            sessionStorage.setItem('currentFoodData', JSON.stringify(currentFoodData));
+        });
+
+        el.addEventListener('pointercancel', e => {
+            dragging = false;
+            el.classList.remove('dragging');
+            try { el.releasePointerCapture(e.pointerId); } catch {}
+        });
+    }
+
+    // Supabase 保存：把 currentFoodData 整个作为 raw_data 存进去
+    async function saveRecord() {
+        try {
+            const saveBtn = document.querySelector('button[onclick="saveRecord()"]');
+            saveBtn.innerText = '保存中...';
+            saveBtn.disabled = true;
+
+            const SUPABASE_URL = 'https://hwztfcquovjiuobflnax.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_fMBxcS2opE2Pukl2M-ipQA_gIc9bzgb';
+            const TABLE_NAME = 'food_logs';
+
+            const mealType = sessionStorage.getItem('selectedMealType') || '午餐';
+            const imageBase64 = sessionStorage.getItem('uploadedFoodImage');
+            currentFoodData.image = imageBase64;
+            const saveFoodName = getDisplayFoodName(currentFoodData, mealType);
+
+            const recordData = {
+                food_name: saveFoodName,
+                calories: currentFoodData.calories || 0,
+                protein: currentFoodData.protein || 0,
+                fat: currentFoodData.fat || 0,
+                carbs: currentFoodData.carbs || 0,
+                vitamins_minerals: currentFoodData.vitamins_minerals || '未知',
+                meal_type: mealType,
+                raw_data: currentFoodData
+            };
+
+            const resp = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE_NAME}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify(recordData)
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(JSON.stringify(err));
+            }
+
+            sessionStorage.removeItem('currentFoodData');
+            sessionStorage.removeItem('uploadedFoodImage');
+            window.location.href = 'index.html';
+        } catch (e) {
+            console.error(e);
+            alert('保存失败：' + e.message);
+            const saveBtn = document.querySelector('button[onclick="saveRecord()"]');
+            saveBtn.innerText = '保存记录';
+            saveBtn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>

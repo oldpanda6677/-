@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 健康饮食</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-progress { transition: stroke-dasharray 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .animate-width { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .cursor-grab { cursor: grab; }
+        .cursor-grabbing { cursor: grabbing; }
+    </style>
+</head>
+<body class="bg-gray-50 flex justify-center">
+
+    <div class="w-full max-w-md min-h-screen bg-white relative shadow-2xl pb-32">
+    <main class="flex-1 overflow-y-auto no-scrollbar pb-32 px-5 pt-6">
+            <div class="flex items-center justify-between mb-4">
+            <h1 class="text-3xl font-bold text-gray-900">今天</h1>
+            <button onclick="openProfileModal()"
+                    class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-[12px] active:scale-95 transition-transform">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                          d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                          d="M19.4 15a1.65 1.65 0 01.33 1.82l-1 1.73a1.65 1.65 0 01-1.51.83 1.65 1.65 0 01-.6-.11l-2-.77a6.4 6.4 0 01-2.24 1.3l-.3 2.08A1.65 1.65 0 0110.44 24h-2a1.65 1.65 0 01-1.63-1.39l-.3-2.08a6.4 6.4 0 01-2.24-1.3l-2 .77a1.65 1.65 0 01-2.11-.72l-1-1.73A1.65 1.65 0 010 15.86l1.7-.99a6.5 6.5 0 010-2.74L0 11.14A1.65 1.65 0 01.33 9.32l1-1.73a1.65 1.65 0 011.51-.83c.2 0 .4.04.6.11l2 .77a6.4 6.4 0 012.24-1.3l.3-2.08A1.65 1.65 0 0110.44 3h2a1.65 1.65 0 011.63 1.39l.3 2.08a6.4 6.4 0 012.24 1.3l2-.77a1.65 1.65 0 012.11.72l1 1.73A1.65 1.65 0 0123 11.14l-1.7.99c.06.45.06.9 0 1.35z"/>
+                </svg>
+                <span>个人资料</span>
+            </button>
+        </div>
+        
+        <!-- 日历容器 -->
+        <div id="calendar-container" class="flex items-center justify-between text-sm text-gray-500 mb-5 px-4 pb-2 overflow-x-auto no-scrollbar"></div>
+
+        <!-- 核心：饮食摄入卡片 -->
+        <div class="relative mt-12">
+            <div class="absolute bottom-0 left-0 w-full h-[130px] bg-[#EDF3FF] rounded-[28px] shadow-sm z-0"></div>
+            <div class="relative z-10 flex justify-between items-start px-6 pt-2 pb-5">
+                <div class="text-left mt-10 w-20">
+                    <div class="text-gray-500 text-xs mb-1">饮食摄入</div>
+                    <div id="val-intake" class="text-2xl font-bold text-gray-900 leading-none transition-all">0</div>
+                    <div class="text-gray-400 text-[10px] mt-1.5">千卡</div>
+                </div>
+
+                <div class="relative w-[180px] h-[160px] flex justify-center -mt-12">
+                    <svg width="180" height="180" viewBox="0 0 180 180" class="absolute top-0 left-0 z-0 pointer-events-none">
+                        <circle cx="90" cy="90" r="74" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-dasharray="310 465" transform="rotate(150 90 90)" />
+                        <circle id="val-ring" cx="90" cy="90" r="74" fill="none" stroke="#9DB9FC" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 465" transform="rotate(150 90 90)" class="animate-progress" />
+                    </svg>
+                    <div class="absolute top-[30px] left-[30px] w-[120px] h-[120px] bg-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center z-10">
+                        <div class="text-gray-400 text-[11px] mb-1">你还可以吃</div>
+                        <div id="val-remain" class="text-4xl font-bold text-gray-900 leading-none mb-1 transition-all">1268</div>
+                        <div class="text-gray-400 text-[10px]"><span id="val-target">1268</span>kcal</div>
+                    </div>
+                </div>
+
+                <div class="text-right mt-10 w-20">
+                    <div class="text-gray-500 text-xs mb-1">运动消耗</div>
+                    <div id="val-burned" class="text-2xl font-bold text-gray-900 leading-none transition-all">0</div>
+                    <div class="text-gray-400 text-[10px] mt-1.5">千卡</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 喝水打卡 -->
+        <div class="mt-4 bg-[#EDF3FF] rounded-[20px] p-4 relative h-[96px] shadow-sm cursor-pointer active:scale-95 transition-transform" onclick="addWater()">
+            <div class="flex justify-between items-start">
+                <span class="text-gray-900 font-medium text-[15px]">喝水</span>
+                <button class="w-7 h-7 bg-[#9DB9FC] rounded-full flex items-center justify-center text-white shadow-sm pointer-events-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </button>
+            </div>
+            <div class="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 w-full justify-center">
+                <svg class="w-9 h-9" viewBox="0 0 24 24">
+                    <defs>
+                        <clipPath id="water-clip"><path d="M12 2.5C11.8 2.5 11.6 2.6 11.5 2.8C9.4 6 6 9.7 6 13.2C6 16.9 8.7 19.5 12 19.5C15.3 19.5 18 16.9 18 13.2C18 9.7 14.6 6 12.5 2.8C12.4 2.6 12.2 2.5 12 2.5Z"/></clipPath>
+                    </defs>
+                    <rect id="water-fill" x="4" y="22" width="16" height="0" fill="#9DB9FC" clip-path="url(#water-clip)"/>
+                    <path d="M10 8.5C9.1 9.3 8.5 10.5 8.5 11.8" stroke="white" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+                    <path d="M12 2.5C11.8 2.5 11.6 2.6 11.5 2.8C9.4 6 6 9.7 6 13.2C6 16.9 8.7 19.5 12 19.5C15.3 19.5 18 16.9 18 13.2C18 9.7 14.6 6 12.5 2.8C12.4 2.6 12.2 2.5 12 2.5Z" fill="none" stroke="#9DB9FC" stroke-width="1.4"/>
+                </svg>
+                <div class="flex items-baseline gap-1">
+                    <span id="val-water" class="text-gray-900 font-medium text-2xl transition-all">180</span>
+                    <span class="text-gray-400 text-sm">ml /2000ml</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 饮食/运动打卡列表 -->
+        <div class="mt-4">
+            <div class="relative w-full h-[42px] flex">
+                <div id="tab-sport" onclick="switchTab('sport')" class="absolute right-0 w-[55%] h-full bg-[#9DB9FC] rounded-t-[18px] z-0 flex items-center justify-center text-sm font-medium text-white pl-4 cursor-pointer transition-all">运动打卡</div>
+                <div id="tab-diet" onclick="switchTab('diet')" class="absolute left-0 w-[55%] h-full bg-[#F8F9FB] rounded-t-[18px] z-10 flex items-center justify-center text-sm font-medium text-gray-800 shadow-[2px_0_8px_rgba(0,0,0,0.02)] cursor-pointer transition-all">饮食打卡</div>
+            </div>
+            <!-- 外层灰底卡片：负责圆角和整体留白 -->
+            <div class="bg-[#F8F9FB] rounded-b-[24px] px-5 pt-3 pb-3 -mt-[1px] relative z-20 shadow-sm">
+                <!-- 内层滚动区域：列表实际滚动的裁剪区域 -->
+                <div id="list-container" class="max-h-[223px] overflow-y-auto no-scrollbar">
+                    <!-- 列表内容由 JS 动态渲染 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部营养素总览 -->
+        <div class="mt-4 bg-[#F8F9FB] rounded-[24px] p-5 shadow-sm mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <span class="font-bold text-gray-900 text-[15px]">营养素</span>
+                <span id="val-nutri-percent" class="text-[#43AE7A] text-sm">0%达成</span>
+            </div>
+            <div class="w-full h-2.5 flex rounded-full overflow-hidden mb-5 bg-gray-200">
+                <div id="bar-carbs" class="bg-[#F9D780] h-full animate-width" style="width: 0%"></div>
+                <div id="bar-protein" class="bg-[#9DB9FC] h-full animate-width" style="width: 0%"></div>
+                <div id="bar-fat" class="bg-[#EF8686] h-full animate-width" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between items-center px-1">
+                <div class="flex flex-col">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <div class="w-1.5 h-3.5 bg-[#F9D780] rounded-full"></div>
+                        <span class="text-gray-500 text-[13px]">碳水</span>
+                    </div>
+                    <div class="text-gray-900 text-base font-medium">
+                        <span id="val-carbs">0</span>
+                        <span class="text-gray-400 text-xs font-normal">/<span id="val-carbs-target">0</span>g</span>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <div class="w-1.5 h-3.5 bg-[#9DB9FC] rounded-full"></div>
+                        <span class="text-gray-500 text-[13px]">蛋白质</span>
+                    </div>
+                    <div class="text-gray-900 text-base font-medium">
+                        <span id="val-protein">0</span>
+                        <span class="text-gray-400 text-xs font-normal">/<span id="val-protein-target">0</span>g</span>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <div class="w-1.5 h-3.5 bg-[#EF8686] rounded-full"></div>
+                        <span class="text-gray-500 text-[13px]">脂肪</span>
+                    </div>
+                    <div class="text-gray-900 text-base font-medium">
+                        <span id="val-fat">0</span>
+                        <span class="text-gray-400 text-xs font-normal">/<span id="val-fat-target">0</span>g</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部导航 -->
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] px-8 py-3 flex justify-between items-center z-50 border border-gray-100">
+        <button id="nav-diary" class="flex flex-col items-center text-[#9DB9FC] transition-colors" onclick="window.location.href='index.html'">
+            <span class="text-sm font-medium">日记</span>
+        </button>
+        <button onclick="window.location.href='camera.html'" class="absolute left-1/2 -translate-x-1/2 -top-5 w-14 h-14 bg-[#3A3D46] rounded-full flex items-center justify-center text-white shadow-lg border-4 border-white active:scale-90 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </button>
+        <button id="nav-chart" onclick="window.location.href='chart.html'" class="flex flex-col items-center text-gray-400 transition-colors">
+            <span class="text-sm font-medium">图表</span>
+        </button>
+    </div>
+</div>
+
+<!-- 个人资料弹窗 -->
+<div id="profile-modal" class="fixed inset-0 z-[120] hidden items-center justify-center bg-black/40 px-6">
+    <div class="bg-white rounded-2xl w-full max-w-xs p-5 shadow-xl">
+        <h2 class="text-[16px] font-semibold text-gray-900 mb-3">个人资料</h2>
+        <p class="text-[12px] text-gray-400 mb-4">用于计算更贴合你的每日热量和营养目标。</p>
+        <div class="space-y-3 text-[13px]">
+            <div class="flex items-center justify-between gap-3">
+                <label class="text-gray-600">性别</label>
+                <select id="profile-gender" class="flex-1 border border-gray-200 rounded-xl px-2 py-1.5 text-[13px]">
+                    <option value="female">女</option>
+                    <option value="male">男</option>
+                </select>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <label class="text-gray-600">身高(cm)</label>
+                <input id="profile-height" type="number" min="120" max="220"
+                       class="flex-1 border border-gray-200 rounded-xl px-2 py-1.5 text-[13px]" />
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <label class="text-gray-600">体重(kg)</label>
+                <input id="profile-weight" type="number" min="30" max="150"
+                       class="flex-1 border border-gray-200 rounded-xl px-2 py-1.5 text-[13px]" />
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <label class="text-gray-600">年龄</label>
+                <input id="profile-age" type="number" min="12" max="80"
+                       class="flex-1 border border-gray-200 rounded-xl px-2 py-1.5 text-[13px]" />
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <label class="text-gray-600">活动水平</label>
+                <select id="profile-activity" class="flex-1 border border-gray-200 rounded-xl px-2 py-1.5 text-[13px]">
+                    <option value="sedentary">久坐</option>
+                    <option value="light">轻体力</option>
+                    <option value="moderate">中等活动</option>
+                    <option value="active">重度活动</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex gap-2 mt-5">
+            <button type="button" onclick="closeProfileModal()"
+                    class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[14px]">取消</button>
+            <button type="button" onclick="saveProfile()"
+                    class="flex-1 py-2.5 rounded-xl bg-[#5484FF] text-white text-[14px] font-medium">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 确保整个 JS 不会因为报错而中断
+    try {
+        const supabaseUrl = 'https://hwztfcquovjiuobflnax.supabase.co';
+        const supabaseKey = 'sb_publishable_fMBxcS2opE2Pukl2M-ipQA_gIc9bzgb';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function formatDateKey(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        const today = new Date();
+        const todayKey = formatDateKey(today);
+        
+        let appState = {}; 
+        let currentDateKey = todayKey;
+        let currentTab = 'diet';
+
+        // 个人资料 & 目标计算
+        function getDefaultProfile() {
+            return { gender: 'female', height: 165, weight: 60, age: 30, activity: 'light' };
+        }
+
+        function loadUserProfile() {
+            try {
+                const raw = localStorage.getItem('userProfile');
+                if (!raw) return getDefaultProfile();
+                const p = JSON.parse(raw);
+                return { ...getDefaultProfile(), ...p };
+            } catch {
+                return getDefaultProfile();
+            }
+        }
+
+        function calcUserTargets(profile) {
+            const p = profile || getDefaultProfile();
+            const gender = p.gender === 'male' ? 'male' : 'female';
+            const h = Number(p.height) || 165;
+            const w = Number(p.weight) || 60;
+            const age = Number(p.age) || 30;
+            let bmr;
+            if (gender === 'male') {
+                bmr = 10 * w + 6.25 * h - 5 * age + 5;
+            } else {
+                bmr = 10 * w + 6.25 * h - 5 * age - 161;
+            }
+            const factors = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+            const factor = factors[p.activity] || factors.light;
+            const tdee = Math.round((bmr * factor) / 10) * 10; // 四舍五入到 10 kcal
+            const carb = Math.round(tdee * 0.5 / 4);
+            const protein = Math.round(tdee * 0.2 / 4);
+            const fat = Math.round(tdee * 0.3 / 9);
+            return { kcal: tdee, carb, protein, fat };
+        }
+
+        let userProfile = loadUserProfile();
+        let userTargets = calcUserTargets(userProfile);
+
+        function applyTargetsToUi() {
+            document.getElementById('val-target').innerText = userTargets.kcal;
+            document.getElementById('val-carbs-target').innerText = userTargets.carb;
+            document.getElementById('val-protein-target').innerText = userTargets.protein;
+            document.getElementById('val-fat-target').innerText = userTargets.fat;
+        }
+
+        function openProfileModal() {
+            const modal = document.getElementById('profile-modal');
+            document.getElementById('profile-gender').value = userProfile.gender || 'female';
+            document.getElementById('profile-height').value = userProfile.height || '';
+            document.getElementById('profile-weight').value = userProfile.weight || '';
+            document.getElementById('profile-age').value = userProfile.age || '';
+            document.getElementById('profile-activity').value = userProfile.activity || 'light';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeProfileModal() {
+            const modal = document.getElementById('profile-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveProfile() {
+            const gender = document.getElementById('profile-gender').value || 'female';
+            const height = parseInt(document.getElementById('profile-height').value || '0', 10);
+            const weight = parseInt(document.getElementById('profile-weight').value || '0', 10);
+            const age = parseInt(document.getElementById('profile-age').value || '0', 10);
+            const activity = document.getElementById('profile-activity').value || 'light';
+            userProfile = {
+                gender,
+                height: height || getDefaultProfile().height,
+                weight: weight || getDefaultProfile().weight,
+                age: age || getDefaultProfile().age,
+                activity
+            };
+            localStorage.setItem('userProfile', JSON.stringify(userProfile));
+            userTargets = calcUserTargets(userProfile);
+            applyTargetsToUi();
+            // 重新拉取当天数据，用新的目标刷新仪表
+            fetchRealData(currentDateKey);
+            closeProfileModal();
+        }
+
+        // 恢复日历功能
+        function initCalendar() {
+            const container = document.getElementById('calendar-container');
+            if(!container) return;
+            container.innerHTML = '';
+            const DAYS_WINDOW = 7;
+            const HALF = Math.floor(DAYS_WINDOW / 2);
+            const base = new Date(today);
+            const days = [];
+
+            for (let offset = -HALF; offset <= HALF; offset++) {
+                const d = new Date(base);
+                d.setDate(base.getDate() + offset);
+                days.push(d);
+            }
+
+            days.forEach(d => {
+                const key = formatDateKey(d);
+                const dayNum = d.getDate();
+                const isSelected = key === currentDateKey;
+                const isToday = key === todayKey;
+
+                if (isSelected) {
+                    container.innerHTML += `
+                        <div class="flex-1 flex flex-col items-center justify-center relative cursor-pointer min-w-[40px]" onclick="selectDate('${key}')">
+                            <div class="w-8 h-8 ${isToday ? 'bg-[#4A90E2]' : 'bg-[#9DB9FC]'} text-white rounded-full flex items-center justify-center font-medium shadow-md transition-all">${dayNum}</div>
+                            <div class="w-1 h-1 ${isToday ? 'bg-[#4A90E2]' : 'bg-[#9DB9FC]'} rounded-full mt-1"></div>
+                        </div>`;
+                } else {
+                    container.innerHTML += `
+                        <button class="flex-1 flex flex-col items-center justify-center cursor-pointer min-w-[40px]" onclick="selectDate('${key}')">
+                            <span class="${isToday ? 'font-medium text-[#4A90E2]' : ''}">${dayNum}</span>
+                        </button>`;
+                }
+            });
+        }
+
+        // 增强版：获取真实数据并计算特质标签（饮食 + 运动）
+        async function fetchRealData(dateKey) {
+            const listContainer = document.getElementById('list-container');
+            if(listContainer) listContainer.innerHTML = '<div class="text-center text-gray-400 py-8 text-sm">正在同步数据...</div>';
+            
+            try {
+                const [{ data: foodData, error: foodErr }, { data: sportData, error: sportErr }] = await Promise.all([
+                    supabase.from('food_logs').select('*'),
+                    supabase.from('sport_logs').select('*')
+                ]);
+                if (foodErr) throw foodErr;
+                if (sportErr) throw sportErr;
+
+                const dayLogs = (foodData || [])
+                    .filter(item => formatDateKey(new Date(item.created_at)) === dateKey)
+                    // 列表按时间倒序，最新记录排在最上面
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                const daySports = (sportData || [])
+                    .filter(item => formatDateKey(new Date(item.created_at)) === dateKey)
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                let totalCal = 0, totalCarbs = 0, totalProtein = 0, totalFat = 0;
+                let totalBurned = 0;
+                let dietList = [];
+                let sportList = [];
+
+                dayLogs.forEach(item => {
+                    totalCal += item.calories || 0;
+                    totalCarbs += item.carbs || 0;
+                    totalProtein += item.protein || 0;
+                    totalFat += item.fat || 0;
+
+                    const timeStr = new Date(item.created_at).toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
+                    
+                    // 🌟 动态计算食物特质标签（颜色与下方营养条保持统一）
+                    let featureText = "均衡";
+                    let featureColor = "bg-[#E5E7EB]"; // 默认灰
+                    if (item.protein > 15) { featureText = "高蛋白"; featureColor = "bg-[#9DB9FC]"; } // 与蛋白质条同色：蓝色
+                    else if (item.fat > 15) { featureText = "高脂肪"; featureColor = "bg-[#EF8686]"; } // 与脂肪条同色：红色
+                    else if (item.carbs > 50) { featureText = "高碳水"; featureColor = "bg-[#F9D780]"; } // 与碳水条同色：黄色
+                    else if (item.calories < 150) { featureText = "低卡"; featureColor = "bg-[#43AE7A]"; } // 低卡使用绿色
+
+                    // 从 raw_data 中尝试取出用户上传的图片（base64 或 URL）
+                    const thumb = item.raw_data && item.raw_data.image ? item.raw_data.image : null;
+
+                    dietList.push({
+                        raw: item, // 保存原始数据供详情页使用
+                        time: timeStr,
+                        mealType: item.meal_type || '记录', // 从数据库读取餐段
+                        name: item.food_name || "未知食物",
+                        cal: item.calories || 0, // 仅保存数值，单位在渲染时拆分显示
+                        thumb: thumb,
+                        tag: featureText,
+                        tagColor: featureColor
+                    });
+                });
+
+                daySports.forEach(item => {
+                    const burned = item.calories_burned || 0;
+                    totalBurned += burned;
+                    const timeStr = new Date(item.created_at).toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
+                    const minutes = item.duration_min || 0;
+                    const tag = minutes > 0 ? `${minutes}分钟` : (item.note ? '记录' : '运动');
+                    sportList.push({
+                        raw: item,
+                        time: timeStr,
+                        mealType: '运动',
+                        name: item.sport_type || '运动',
+                        cal: burned,
+                        thumb: null,
+                        tag,
+                        tagColor: "bg-[#9DB9FC]"
+                    });
+                });
+
+                const target = userTargets.kcal;
+                const percent = totalCal > 0 ? Math.min(100, Math.round((totalCal / target) * 100)) + "%" : "0%";
+
+                appState[dateKey] = {
+                    intake: totalCal, burned: totalBurned, target: target,
+                    water: appState[dateKey]?.water || 180, 
+                    carbs: totalCarbs, protein: totalProtein, fat: totalFat,
+                    percent: percent,
+                    diet: dietList, sport: sportList
+                };
+
+                updateDashboard(appState[dateKey]);
+                renderList();
+
+            } catch (err) {
+                console.error(err);
+                if(listContainer) listContainer.innerHTML = '<div class="text-center text-red-400 py-8 text-sm">网络错误，无法拉取数据</div>';
+            }
+        }
+
+        // 挂载到 window 对象，确保 HTML 里的 onclick 能调用到
+        window.selectDate = async function(dateKey) {
+            currentDateKey = dateKey;
+            initCalendar();
+            await fetchRealData(dateKey);
+        }
+
+        function updateWaterDroplet(water) {
+            const max = 2000; const ratio = Math.max(0, Math.min(water / max, 1));
+            const svgHeight = 24; const padding = 3;
+            const h = Math.max(0, (svgHeight - padding * 2) * ratio);
+            const y = svgHeight - padding - h;
+            const fill = document.getElementById('water-fill');
+            if (fill) { fill.setAttribute('y', y.toString()); fill.setAttribute('height', h.toString()); }
+        }
+
+        function updateDashboard(data) {
+            if(!data) return;
+            document.getElementById('val-intake').innerText = data.intake;
+            document.getElementById('val-burned').innerText = data.burned;
+            // 剩余 = 目标 - 摄入 + 运动消耗
+            document.getElementById('val-remain').innerText = Math.max(0, data.target - data.intake + (data.burned || 0));
+            document.getElementById('val-water').innerText = data.water;
+
+            // 圆环只反映“摄入/目标”，不把运动消耗混进去
+            const ratio = Math.min(data.intake / data.target, 1) || 0;
+            document.getElementById('val-ring').style.strokeDasharray = `${310 * ratio} 465`;
+
+            document.getElementById('val-nutri-percent').innerText = data.percent + "达成";
+            document.getElementById('val-carbs').innerText = data.carbs;
+            document.getElementById('val-protein').innerText = data.protein;
+            document.getElementById('val-fat').innerText = data.fat;
+
+            const total = data.carbs + data.protein + data.fat;
+            if (total > 0) {
+                document.getElementById('bar-carbs').style.width = `${(data.carbs / total) * 100}%`;
+                document.getElementById('bar-protein').style.width = `${(data.protein / total) * 100}%`;
+                document.getElementById('bar-fat').style.width = `${(data.fat / total) * 100}%`;
+            } else {
+                document.getElementById('bar-carbs').style.width = '0%';
+                document.getElementById('bar-protein').style.width = '0%';
+                document.getElementById('bar-fat').style.width = '0%';
+            }
+            updateWaterDroplet(data.water);
+        }
+
+        window.switchTab = function(tab) {
+            currentTab = tab;
+            const tabDiet = document.getElementById('tab-diet');
+            const tabSport = document.getElementById('tab-sport');
+            if (tab === 'diet') {
+                tabDiet.className = "absolute left-0 w-[55%] h-full bg-[#F8F9FB] rounded-t-[18px] z-10 flex items-center justify-center text-sm font-medium text-gray-800 shadow-[2px_0_8px_rgba(0,0,0,0.02)] cursor-pointer transition-all";
+                tabSport.className = "absolute right-0 w-[55%] h-full bg-[#9DB9FC] rounded-t-[18px] z-0 flex items-center justify-center text-sm font-medium text-white pl-4 cursor-pointer transition-all";
+            } else {
+                tabSport.className = "absolute right-0 w-[55%] h-full bg-[#F8F9FB] rounded-t-[18px] z-10 flex items-center justify-center text-sm font-medium text-gray-800 shadow-[-2px_0_8px_rgba(0,0,0,0.02)] cursor-pointer transition-all";
+                tabDiet.className = "absolute left-0 w-[55%] h-full bg-[#9DB9FC] rounded-t-[18px] z-0 flex items-center justify-center text-sm font-medium text-white pr-4 cursor-pointer transition-all";
+            }
+            renderList();
+        }
+
+         // 增强版：渲染列表（加入点击跳转和动态标签）
+         function renderList() {
+            const container = document.getElementById('list-container');
+            if(!container) return;
+            const data = appState[currentDateKey]?.[currentTab] || [];
+            container.classList.remove('fade-in'); void container.offsetWidth; container.classList.add('fade-in');
+
+            // 运动 tab 顶部加一个“记录运动”入口
+            const addSportHeader = (currentTab === 'sport')
+                ? `<button class="w-full mb-3 py-2.5 rounded-xl bg-[#9DB9FC]/15 text-[#4A90E2] text-[13px] font-medium active:scale-95 transition-transform" onclick="addSportRecord()">+ 记录运动</button>`
+                : '';
+
+            if (!data.length) {
+                container.innerHTML = addSportHeader + `<div class="text-center text-gray-400 py-4 text-sm">这一天还没有记录哦，快去打卡吧~</div>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach((item, index) => {
+                const isDiet = currentTab === 'diet';
+                const thumbHtml = (isDiet && item.thumb)
+                    ? `<img src="${item.thumb}" class="w-full h-full object-cover rounded-xl" />`
+                    : (isDiet ? '🍱' : '🏃');
+                // 🌟 加入了 onclick 跳转事件，并美化了标签
+                html += `
+                <div class="w-full text-left mb-3 ${isDiet ? 'cursor-pointer' : ''} active:scale-95 transition-transform" ${isDiet ? `onclick="viewDetail('${currentDateKey}', ${index})"` : ''}>
+                    <div class="flex items-center gap-1 text-gray-400 text-xs mb-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="font-medium text-gray-500">${item.mealType}</span> <span class="ml-1">${item.time}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-14 h-14 ${isDiet ? 'bg-orange-100' : 'bg-blue-100'} rounded-xl flex-shrink-0 flex items-center justify-center text-2xl overflow-hidden">
+                            ${thumbHtml}
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-gray-900 font-medium text-[15px] truncate max-w-[120px]">${item.name}</span>
+                                <span class="flex items-baseline gap-0.5">
+                                    <span class="text-gray-900 font-medium text-[15px]">${item.cal}</span>
+                                    <span class="text-gray-400 text-[13px]">kcal</span>
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="${item.tagColor} text-white text-[10px] px-2 py-0.5 rounded-full">${item.tag}</span>
+                                ${isDiet ? `<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>` : ``}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = addSportHeader + html;
+        }
+
+        // 运动打卡：手动新增一条运动记录（写入 sport_logs）
+        window.addSportRecord = async function() {
+            try {
+                const sportType = (prompt("运动类型：", "步行") || "").trim();
+                if (!sportType) return;
+
+                const durationStr = prompt("运动时长(分钟)：", "30");
+                if (durationStr === null) return;
+                const durationMin = parseInt(String(durationStr).trim(), 10) || 0;
+
+                const calStr = prompt("消耗热量(千卡)：", "200");
+                if (calStr === null) return;
+                const caloriesBurned = parseInt(String(calStr).trim(), 10) || 0;
+
+                const note = (prompt("备注(可选)：", "") || "").trim();
+
+                const { error } = await supabase.from('sport_logs').insert([{
+                    sport_type: sportType,
+                    duration_min: durationMin,
+                    calories_burned: caloriesBurned,
+                    // 避免触发 NOT NULL 约束：没填备注时写入空字符串
+                    note: note || ''
+                }]);
+                if (error) throw error;
+
+                await fetchRealData(currentDateKey);
+                switchTab('sport');
+            } catch (e) {
+                console.error(e);
+                alert('运动记录保存失败：' + (e.message || '请检查网络与 Supabase 表'));
+            }
+        }
+
+  // 🌟 修复：点击主页列表，跳转到专用的详情页 (detailed.html)
+window.viewDetail = function(dateKey, index) {
+    // 获取历史记录数据
+    const itemRawData = appState[dateKey].diet[index].raw;
+    itemRawData.mealType = appState[dateKey].diet[index].meal || '餐饮';
+    
+    // 存入缓存
+    sessionStorage.setItem('detailData', JSON.stringify(itemRawData));
+    
+    // 跳转到没有底部按钮的 detailed.html
+    window.location.href = 'detailed.html';
+}
+
+
+        window.addWater = function() {
+            const waterEl = document.getElementById('val-water');
+            let currentWater = parseInt(waterEl.innerText);
+            if (currentWater < 2000) {
+                currentWater += 200;
+                waterEl.innerText = currentWater;
+                if (!appState[currentDateKey]) appState[currentDateKey] = { diet: [], sport: [], water: 0 };
+                appState[currentDateKey].water = currentWater;
+                updateWaterDroplet(currentWater);
+            }
+        }
+
+        // 页面加载时执行
+        window.onload = async () => {
+            initCalendar();
+            updateWaterDroplet(180); // 初始水滴状态
+            await fetchRealData(todayKey);
+        };
+
+    } catch (error) {
+        console.error("初始化严重错误:", error);
+    }
+</script>
+</body>
+</html>

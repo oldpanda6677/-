@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 修复1：统一 Meta 标签，移除可能导致比例差异的强制缩放限制 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图表 - AI 健康饮食</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 修复2：强制显示垂直滚动条轨道，彻底解决切换页面时的左右跳动问题 */
+        body { overflow-y: scroll; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-grow { transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .animate-width { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50 flex justify-center">
+
+    <div class="w-full max-w-md min-h-screen bg-white relative shadow-2xl pb-32">
+        
+        <!-- 内容区：把 padding 移到内层 -->
+        <div class="px-6 pt-8">
+            
+            <!-- 顶部标题与 Tab 切换 -->
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-[20px] font-bold text-gray-900">卡路里摄入趋势</h1>
+                <div class="flex bg-white rounded-full p-1 gap-1 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-50">
+                    <button id="tab-week" onclick="switchTab('week')" class="px-4 py-1.5 rounded-full text-[15px] font-medium bg-[#9DB9FC] text-white transition-colors">周</button>
+                    <button id="tab-month" onclick="switchTab('month')" class="px-4 py-1.5 rounded-full text-[15px] font-medium text-[#9DB9FC] bg-transparent transition-colors">月</button>
+                    <button id="tab-year" onclick="switchTab('year')" class="px-4 py-1.5 rounded-full text-[15px] font-medium text-[#9DB9FC] bg-transparent transition-colors">年</button>
+                </div>
+            </div>
+
+            <!-- 数据总览 -->
+            <div class="flex justify-between items-end mb-4 px-1">
+                <div>
+                    <div class="text-gray-400 text-[13px] mb-1">日均摄入</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="val-avg" class="text-2xl font-bold text-gray-900 transition-all">1850</span>
+                        <span class="text-gray-400 text-sm">kcal</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-gray-400 text-[13px] mb-1">目标</div>
+                    <div class="flex items-baseline gap-1 justify-end">
+                        <span id="val-target" class="text-2xl font-bold text-gray-900 transition-all">2000</span>
+                        <span class="text-gray-400 text-sm">kcal</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 核心图表区域 -->
+            <div class="bg-[#F4F8FF] rounded-[24px] p-5 pt-8 pb-5 mb-8">
+                <div class="relative h-[150px] pl-8 pr-1">
+                    <div class="absolute inset-0 left-8 flex flex-col justify-between pointer-events-none z-0">
+                        <div class="w-full h-[1px] bg-gray-200/80 relative"><span class="absolute -left-9 -top-2 text-[10px] text-gray-400 w-7 text-right">2,500</span></div>
+                        <div class="w-full h-[1px] bg-gray-200/80 relative"><span class="absolute -left-9 -top-2 text-[10px] text-gray-400 w-7 text-right">2,000</span></div>
+                        <div class="w-full h-[1px] bg-gray-200/80 relative"><span class="absolute -left-9 -top-2 text-[10px] text-gray-400 w-7 text-right">1,500</span></div>
+                        <div class="w-full h-[1px] bg-gray-200/80 relative"><span class="absolute -left-9 -top-2 text-[10px] text-gray-400 w-7 text-right">1,000</span></div>
+                        <div class="w-full h-[1px] bg-gray-200/80 relative"><span class="absolute -left-9 -top-2 text-[10px] text-gray-400 w-7 text-right">500</span></div>
+                        <div class="w-full h-[1px] bg-gray-200/80 relative"><span class="absolute -left-9 -top-2 text-[10px] text-gray-400 w-7 text-right">0</span></div>
+                    </div>
+                    <div id="chart-target-line" class="absolute left-8 right-1 border-b-[1.5px] border-dashed border-[#EF8686] z-10 transition-all duration-700 ease-in-out" style="bottom: 80%;"></div>
+                    <div class="absolute inset-0 left-8 right-1 flex justify-between items-end z-20" id="chart-bars"></div>
+                </div>
+                <div class="flex justify-between items-center pl-8 pr-1 mt-3 text-[11px] text-gray-400" id="chart-labels"></div>
+            </div>
+
+            <!-- 营养摄入分析 -->
+            <h2 class="text-[16px] font-bold text-gray-900 mb-5">营养摄入分析</h2>
+            <div class="flex flex-col gap-5 mb-8" id="nutrition-container">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-1.5">
+                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                            <span class="text-gray-900 font-medium text-[15px]">蛋白质</span>
+                        </div>
+                        <div class="text-[13px] text-gray-400">
+                            目标 <span id="nutri-pro-target" class="text-gray-900">75g</span> <span class="mx-1">当前</span> <span id="nutri-pro-current" class="text-gray-900">65g</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden"><div id="bar-pro" class="h-full bg-[#FCD34D] rounded-full animate-width" style="width: 0%"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-1.5">
+                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"/></svg>
+                            <span class="text-gray-900 font-medium text-[15px]">碳水</span>
+                        </div>
+                        <div class="text-[13px] text-gray-400">
+                            目标 <span id="nutri-carb-target" class="text-gray-900">200g</span> <span class="mx-1">当前</span> <span id="nutri-carb-current" class="text-gray-900">185g</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden"><div id="bar-carb" class="h-full bg-[#9DB9FC] rounded-full animate-width" style="width: 0%"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-1.5">
+                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                            <span class="text-gray-900 font-medium text-[15px]">脂肪</span>
+                        </div>
+                        <div class="text-[13px] text-gray-400 flex items-center">
+                            目标 <span id="nutri-fat-target" class="text-gray-900 ml-1">50g</span> <span class="mx-1">当前</span> <span id="nutri-fat-current" class="text-gray-900">55g</span>
+                            <span id="nutri-fat-badge" class="ml-1.5 bg-[#FEE2E2] text-[#EF8686] text-[10px] px-1.5 py-0.5 rounded-full hidden">超标</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden"><div id="bar-fat" class="h-full bg-[#EF8686] rounded-full animate-width" style="width: 0%"></div></div>
+                </div>
+            </div>
+
+            <!-- AI 建议卡片 -->
+            <div class="bg-[#F4F8FF] rounded-[20px] p-4 flex items-center gap-4 mb-6 fade-in" id="ai-suggestion-box">
+                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <svg class="w-6 h-6 text-[#9DB9FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                </div>
+                <p id="ai-text" class="text-[#4A5568] text-[13px] leading-relaxed">今天的坚果/油脂类稍微收一收，晚餐更清爽会更稳哦~</p>
+            </div>
+
+        </div>
+
+        <!-- 修复4：移除了多余的 border，与主页底栏样式完全统一 -->
+        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-[360px] bg-white rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] px-8 py-3 flex justify-between items-center z-50">
+            <button onclick="window.location.href='index.html'" class="flex flex-col items-center text-gray-400 transition-colors">
+                <span class="text-sm font-medium">日记</span>
+            </button>
+            <button onclick="window.location.href='camera.html'" class="absolute left-1/2 -translate-x-1/2 -top-5 w-14 h-14 bg-[#3A3D46] rounded-full flex items-center justify-center text-white shadow-lg border-4 border-white active:scale-90 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </button>
+            <button class="flex flex-col items-center text-[#9DB9FC] transition-colors">
+                <span class="text-sm font-medium">图表</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- 交互逻辑 JavaScript -->
+    <script>
+        const Y_MAX = 2500;
+
+        function getDefaultProfile() {
+            return { gender: 'female', height: 165, weight: 60, age: 30, activity: 'light' };
+        }
+
+        function loadUserProfile() {
+            try {
+                const raw = localStorage.getItem('userProfile');
+                if (!raw) return getDefaultProfile();
+                const p = JSON.parse(raw);
+                return { ...getDefaultProfile(), ...p };
+            } catch {
+                return getDefaultProfile();
+            }
+        }
+
+        function calcUserTargets(profile) {
+            const p = profile || getDefaultProfile();
+            const gender = p.gender === 'male' ? 'male' : 'female';
+            const h = Number(p.height) || 165;
+            const w = Number(p.weight) || 60;
+            const age = Number(p.age) || 30;
+            let bmr;
+            if (gender === 'male') {
+                bmr = 10 * w + 6.25 * h - 5 * age + 5;
+            } else {
+                bmr = 10 * w + 6.25 * h - 5 * age - 161;
+            }
+            const factors = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+            const factor = factors[p.activity] || factors.light;
+            const tdee = Math.round((bmr * factor) / 10) * 10;
+            const carb = Math.round(tdee * 0.5 / 4);
+            const protein = Math.round(tdee * 0.2 / 4);
+            const fat = Math.round(tdee * 0.3 / 9);
+            return { kcal: tdee, carb, protein, fat };
+        }
+
+        const userProfile = loadUserProfile();
+        const userTargets = calcUserTargets(userProfile);
+
+        const chartData = {
+            week: {
+                avg: 1850,
+                target: userTargets.kcal,
+                labels:['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                values:[1750, 1950, 1300, 2100, 1950, 2250, 1200],
+                nutrition: {
+                    pro: { target: userTargets.protein, current: 65 },
+                    carb: { target: userTargets.carb, current: 185 },
+                    fat: { target: userTargets.fat, current: 55, over: true }
+                },
+                ai: "今天的坚果/油脂类稍微收一收，晚餐更清爽会更稳哦~"
+            },
+            month: {
+                avg: 1680,
+                target: Math.round(userTargets.kcal * 7), /* 以周为单位 */
+                labels: ['第一周', '第二周', '第三周', '第四周'],
+                values:[1600, 1850, 1500, 1770],
+                nutrition: {
+                    pro: { target: Math.round(userTargets.protein * 7), current: 68 },
+                    carb: { target: Math.round(userTargets.carb * 7), current: 170 },
+                    fat: { target: Math.round(userTargets.fat * 7), current: 40, over: false }
+                },
+                ai: "本月整体摄入控制得非常完美！体重应该有稳步下降趋势，继续保持。"
+            },
+            year: {
+                avg: 2150,
+                // 这里把「年」理解为最近 30 天的趋势区间，目标按 30 天算
+                target: Math.round(userTargets.kcal * 30),
+                labels:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+                values:[2000, 1900, 2100, 2200, 2050, 1950, 2150, 2250, 2300, 2400, 2350, 2500],
+                nutrition: {
+                    pro: { target: Math.round(userTargets.protein * 30), current: 78 },
+                    carb: { target: Math.round(userTargets.carb * 30), current: 230 },
+                    fat: { target: Math.round(userTargets.fat * 30), current: 65, over: true }
+                },
+                ai: "从年度走势来看，夏末和冬季的热量摄入相对偏高，可以尝试在这两个阶段多安排几天清爽的低脂日。"
+            }
+        };
+
+          // =====================================================================
+        // 🌟 新增：读取真实拍照数据，并无缝融合到图表中
+        // =====================================================================
+        try {
+            const foodDataStr = sessionStorage.getItem('currentFoodData');
+            if (foodDataStr) {
+                const realData = JSON.parse(foodDataStr);
+                
+                // 提取真实数据（如果没有则默认为0）
+                const realCal = realData.calories || 0;
+                const realPro = realData.protein || 0;
+                const realFat = realData.fat || 0;
+                const realCarb = realData.carbs || 0;
+                const foodName = realData.food_name || realData.food_name_db || '新食物';
+
+                // 1. 把真实热量加到“本周”的最后一天（假设周日是今天，即 values 数组的最后一个元素）
+                chartData.week.values[6] += realCal;
+                
+                // 2. 重新计算一下本周平均摄入
+                chartData.week.avg = Math.round(chartData.week.avg + (realCal / 7));
+
+                // 3. 把真实的营养素加到“当前”进度条里
+                chartData.week.nutrition.pro.current += realPro;
+                chartData.week.nutrition.carb.current += realCarb;
+                chartData.week.nutrition.fat.current += realFat;
+
+                // 4. 动态判断脂肪是否超标，控制红色警告徽章的显示
+                if (chartData.week.nutrition.fat.current > chartData.week.nutrition.fat.target) {
+                    chartData.week.nutrition.fat.over = true;
+                }
+
+                // 5. 在 AI 建议里加上刚刚吃的食物
+                chartData.week.ai = `刚刚摄入了【${foodName}】(${realCal}kcal)。` + chartData.week.ai;
+            }
+        } catch (e) {
+            console.error("读取真实数据失败", e);
+        }
+        // =====================================================================
+        // 🌟 新增结束
+        // =====================================================================
+
+        function switchTab(tab) {
+            const data = chartData[tab];
+            ['week', 'month', 'year'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                btn.className = t === tab ? "px-4 py-1.5 rounded-full text-[15px] font-medium bg-[#9DB9FC] text-white transition-colors shadow-sm" : "px-4 py-1.5 rounded-full text-[15px] font-medium text-[#9DB9FC] bg-transparent transition-colors hover:bg-blue-50";
+            });
+            document.getElementById('val-avg').innerText = data.avg;
+            document.getElementById('val-target').innerText = data.target;
+            renderChart(data);
+            updateNutrition(data.nutrition);
+            const aiBox = document.getElementById('ai-suggestion-box');
+            aiBox.classList.remove('fade-in');
+            void aiBox.offsetWidth; 
+            aiBox.classList.add('fade-in');
+            document.getElementById('ai-text').innerText = data.ai;
+        }
+
+        function renderChart(data) {
+            const barsContainer = document.getElementById('chart-bars');
+            const labelsContainer = document.getElementById('chart-labels');
+            // 红色虚线表示「每日目标热量」，与当前视图（周/月/年）无关，始终基于个人档案计算的每日 TDEE
+            const dailyTarget = userTargets.kcal;
+            const targetPercent = Math.min(Math.max((dailyTarget / Y_MAX) * 100, 0), 100);
+            document.getElementById('chart-target-line').style.bottom = `${targetPercent}%`;
+
+            let barsHtml = ''; let labelsHtml = '';
+            data.values.forEach((val, index) => {
+                barsHtml += `<div class="flex flex-col justify-end items-center flex-1 h-full relative group cursor-pointer"><div class="w-3.5 bg-gradient-to-b from-[#86EED6] to-[#D9E8FF] rounded-full animate-grow transition-all duration-500 ease-out group-hover:shadow-[0_0_12px_rgba(134,238,214,0.6)]" style="height: 0%"></div></div>`;
+                labelsHtml += `<span class="flex-1 text-center">${data.labels[index]}</span>`;
+            });
+            barsContainer.innerHTML = barsHtml; labelsContainer.innerHTML = labelsHtml;
+
+            setTimeout(() => {
+                const bars = barsContainer.children;
+                data.values.forEach((val, index) => {
+                    bars[index].firstElementChild.style.height = `${Math.min((val / Y_MAX) * 100, 100)}%`;
+                });
+            }, 50);
+        }
+
+        function updateNutrition(nutri) {
+            ['pro', 'carb', 'fat'].forEach(type => {
+                const data = nutri[type];
+                document.getElementById(`nutri-${type}-target`).innerText = `${data.target}g`;
+                document.getElementById(`nutri-${type}-current`).innerText = `${data.current}g`;
+                document.getElementById(`bar-${type}`).style.width = `${Math.min((data.current / data.target) * 100, 100)}%`;
+                if(type === 'fat') {
+                    const badge = document.getElementById('nutri-fat-badge');
+                    if(data.over) { badge.classList.remove('hidden'); document.getElementById('bar-fat').classList.replace('bg-[#EF8686]', 'bg-[#F87171]'); } 
+                    else { badge.classList.add('hidden'); document.getElementById('bar-fat').classList.replace('bg-[#F87171]', 'bg-[#EF8686]'); }
+                }
+            });
+        }
+
+        window.onload = () => switchTab('week');
+    </script>
+</body>
+</html>
